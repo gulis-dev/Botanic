@@ -4,15 +4,11 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="f4f19ecf-cf9f-4f97-ac38-37c054eb9bd2" name="Changes" comment="first test version">
-      <change afterPath="$PROJECT_DIR$/assets/icons/back_icon.svg" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/assets/icons/forward_icon.svg" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/assets/icons/home_icon.svg" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/assets/icons/reload_icon.svg" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/browser.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/Przegladarka.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/Przegladarka.iml" afterDir="false" />
+    <list default="true" id="f4f19ecf-cf9f-4f97-ac38-37c054eb9bd2" name="Changes" comment="&#10;&#10;create card bar">
+      <change afterPath="$PROJECT_DIR$/assets/icons/menu_icon.svg" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/data/history.json" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/browser.py" beforeDir="false" afterPath="$PROJECT_DIR$/browser.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -122,12 +118,41 @@
       <option name="project" value="LOCAL" />
       <updated>1737201157744</updated>
     </task>
-    <option name="localTasksCounter" value="3" />
+    <task id="LOCAL-00003" summary="add navigation buttons">
+      <option name="closed" value="true" />
+      <created>1737210389384</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1737210389384</updated>
+    </task>
+    <task id="LOCAL-00004" summary="&#10;&#10;create card bar">
+      <option name="closed" value="true" />
+      <created>1737287989259</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1737287989259</updated>
+    </task>
+    <option name="localTasksCounter" value="5" />
     <servers />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="first commit" />
     <MESSAGE value="first test version" />
-    <option name="LAST_COMMIT_MESSAGE" value="first test version" />
+    <MESSAGE value="add navigation buttons" />
+    <MESSAGE value="&#10;&#10;create card bar" />
+    <option name="LAST_COMMIT_MESSAGE" value="&#10;&#10;create card bar" />
   </component>
 </project>

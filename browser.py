@@ -1,5 +1,9 @@
+import json
+from datetime import datetime
+
 from PyQt6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QLineEdit, QProgressBar, QHBoxLayout, \
-    QToolButton, QTabWidget
+    QToolButton, QTabWidget, QMenu, QSpacerItem, QSizePolicy, QLabel, QTableWidgetItem, QScrollArea, QTableWidget, \
+    QHeaderView
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtCore import QUrl, Qt
 from PyQt6.QtGui import QIcon
@@ -87,8 +91,69 @@ class Browser(QMainWindow):
                 padding-left: 30px
             }
         """)
-
         self.address_layout.addWidget(self.address_bar)
+
+        # Tworzenie przycisku z menu rozwijanym
+        self.menu_button = QToolButton(self)
+        self.menu_button.setIcon(QIcon("assets/icons/menu_icon.svg"))
+        self.menu_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.menu_button.setArrowType(Qt.ArrowType.NoArrow)
+        self.menu_button.setStyleSheet("""
+            QToolButton {
+                color: white;
+                border-radius: 17px;
+                padding: 8px;
+                border: none;
+                margin: 5px;
+            }
+            QToolButton::menu-indicator { 
+                image: none;  /* Usuwa wskaźnik strzałki */
+                width: 0px;   /* Ustawia szerokość wskaźnika na 0 */
+            }
+            QToolButton:hover {
+                background-color: #524025;
+            }
+            QToolButton:pressed {
+                background-color: #8c5400; 
+            }
+        """)
+
+        # Tworzenie menu rozwijanego
+        menu = QMenu(self)
+        menu.setStyleSheet("""
+            QMenu {
+                background-color: #2c2c2c;
+                border: 1px solid #444;
+                padding: 5px;
+                border-radius: 5px;
+            }
+            QMenu::item {
+                color: white;
+                padding: 7px 35px;  /* Odstępy wewnętrzne */
+                border-radius: 5px;
+            }
+            QMenu::item:selected {
+                background-color: #524025;  /* Kolor podświetlenia */
+            }
+        """)
+
+
+        # Nowa karta
+        history_action = menu.addAction("New card")
+        history_action.triggered.connect(lambda: self.add_new_tab("https://www.google.com"))
+
+        # Historia
+        history_action = menu.addAction("History")
+        history_action.triggered.connect(self.show_history_on_new_tab)
+
+        # Cookies
+        example_action = menu.addAction("Cookies")
+        example_action.triggered.connect(lambda: print("Cookies"))
+
+        # Dodanie menu do przycisku
+        self.menu_button.setMenu(menu)
+
+        self.address_layout.addWidget(self.menu_button)
 
         # Widget z kartami
         self.tab_widget = QTabWidget(self)
@@ -136,6 +201,7 @@ class Browser(QMainWindow):
         self.progress_bar.setRange(0, 100)
         self.layout.addWidget(self.progress_bar)
 
+
     def navigate_to_url(self):
         url = self.address_bar.text()
         if not url.startswith('http://') and not url.startswith('https://'):
@@ -181,6 +247,7 @@ class Browser(QMainWindow):
             browser.forward()
 
     def on_url_changed(self, url):
+        self.save_history()
         self.address_bar.setText(url.toString())
 
     def update_tab_info(self, browser):
@@ -224,3 +291,124 @@ class Browser(QMainWindow):
         if browser:
             self.update_address_bar(browser.url())
 
+    def show_history_on_new_tab(self):
+        history_widget = QWidget(self)
+        history_layout = QVBoxLayout(history_widget)
+
+        table_widget = QTableWidget(self)
+        table_widget.setColumnCount(2)
+        table_widget.setHorizontalHeaderLabels(["URL", "Timestamp"])
+
+        header = table_widget.horizontalHeader()
+        header.setStretchLastSection(True)
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+
+        table_widget.setSortingEnabled(True)
+        table_widget.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+
+
+        table_widget.setStyleSheet("""
+            QTableWidget {
+                background-color: #2c2c2c;
+                color: white;
+                border: 1px solid #444;
+                border-radius: 5px;
+            }
+            QTableWidget::item {
+                background-color: #333;
+                border: 1px solid #444;
+                padding: 10px;
+            }
+            QTableWidget::item:selected {
+                background-color: #524025;
+            }
+            QHeaderView::section {
+                background-color: #404040;
+                color: white;
+                border: 1px solid #444;
+                padding: 5px;
+            }
+            QScrollArea {
+                border: none;
+            }
+        """)
+
+        try:
+            with open('data/history.json', 'r') as file:
+                data = json.load(file)
+                history_list = data.get("history", [])
+
+                if not history_list:
+                    label = QLabel("Brak historii przeglądania.", self)
+                    history_layout.addWidget(label)
+                else:
+                    history_list.reverse()
+
+                    # Dodawanie danych do tabeli
+                    table_widget.setRowCount(len(history_list))
+                    for row, entry in enumerate(history_list):
+                        url = entry["url"]
+                        timestamp = entry["timestamp"]
+                        if len(url) >= 50:
+                            url = url[:50] + "..."
+                        table_widget.setItem(row, 0, QTableWidgetItem(url))
+                        table_widget.setItem(row, 1, QTableWidgetItem(timestamp))
+
+                        table_widget.item(row, 0).setData(Qt.ItemDataRole.UserRole, url)
+                        table_widget.item(row, 0).setFlags(
+                            table_widget.item(row,0).flags() | Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
+
+        except FileNotFoundError:
+            print("Nie znaleziono pliku z historią.")
+            label = QLabel("Nie znaleziono pliku z historią.", self)
+            history_layout.addWidget(label)
+
+        scroll_area = QScrollArea(self)
+        scroll_area.setWidget(table_widget)
+        scroll_area.setWidgetResizable(True)
+
+        history_layout.addWidget(scroll_area)
+
+        index = self.tab_widget.addTab(history_widget, "History")
+        self.tab_widget.setCurrentIndex(index)
+
+        table_widget.itemClicked.connect(self.open_url_from_table)
+
+    def open_url_from_table(self, item):
+        url = item.data(Qt.ItemDataRole.UserRole)
+        if url:
+            self.add_new_tab(url)
+
+    def save_history(self):
+        container = self.tab_widget.currentWidget()
+        browser = container.findChild(QWebEngineView)
+
+        if browser:
+            history = browser.history()
+            new_history_item = None
+            for i in range(history.count()):
+                history_item = history.itemAt(i)
+                url = history_item.url().toString()
+                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                new_history_item = {"url": url, "timestamp": timestamp}
+
+            history_list = []
+            try:
+                with open('data/history.json', 'r') as file:
+                    data = json.load(file)
+                    history_list = data.get("history", [])
+            except FileNotFoundError:
+                print("Nie znaleziono pliku z historią.")
+
+            if new_history_item and new_history_item not in history_list:
+                history_list.append(new_history_item)
+
+            with open('data/history.json', 'w') as file:
+                json.dump({"history": history_list}, file, indent=4)
+
+    def open_url_from_history(self, url):
+        container = self.tab_widget.currentWidget()
+        browser = container.findChild(QWebEngineView)
+
+        if browser:
+            browser.setUrl(QUrl(url))
