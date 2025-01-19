@@ -1,8 +1,8 @@
 import json
 from datetime import datetime
 
-from PyQt6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QLineEdit, QProgressBar, QHBoxLayout, \
-    QToolButton, QTabWidget, QMenu, QSpacerItem, QSizePolicy, QLabel, QTableWidgetItem, QScrollArea, QTableWidget, \
+from PyQt6.QtWidgets import QMainWindow, QVBoxLayout, QWidget, QLineEdit, QProgressBar, QHBoxLayout, \
+    QToolButton, QTabWidget, QMenu, QLabel, QTableWidgetItem, QScrollArea, QTableWidget, \
     QHeaderView
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtCore import QUrl, Qt
@@ -11,10 +11,12 @@ from PyQt6.QtGui import QIcon
 import os
 os.environ["QT_QPA_PLATFORM_PLUGIN_PATH"] = "/opt/homebrew/Cellar/qt/6.7.3/share/qt/plugins/platforms"
 
+
 class Browser(QMainWindow):
     def __init__(self):
         super().__init__()
 
+        # Ustawienia okna głównego
         self.setWindowTitle("Botanic Web Browser")
         self.setGeometry(100, 100, 1200, 800)
 
@@ -27,7 +29,7 @@ class Browser(QMainWindow):
         self.layout.setContentsMargins(0, 0, 0, 0)
         self.layout.setSpacing(0)
 
-        # Pasek narzędzi i pasek adresu (nad kartami)
+        # Pasek narzędzi i pasek adresu
         self.address_layout = QHBoxLayout()
         self.layout.addLayout(self.address_layout)
 
@@ -93,7 +95,7 @@ class Browser(QMainWindow):
         """)
         self.address_layout.addWidget(self.address_bar)
 
-        # Tworzenie przycisku z menu rozwijanym
+        # Przycisk Menu
         self.menu_button = QToolButton(self)
         self.menu_button.setIcon(QIcon("assets/icons/menu_icon.svg"))
         self.menu_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
@@ -118,7 +120,7 @@ class Browser(QMainWindow):
             }
         """)
 
-        # Tworzenie menu rozwijanego
+        # Menu Rozwijane
         menu = QMenu(self)
         menu.setStyleSheet("""
             QMenu {
@@ -138,17 +140,17 @@ class Browser(QMainWindow):
         """)
 
 
-        # Nowa karta
+        # Opcja 1: Nowa karta
         history_action = menu.addAction("New card")
         history_action.triggered.connect(lambda: self.add_new_tab("https://www.google.com"))
 
-        # Historia
+        # Opcja 2: Historia
         history_action = menu.addAction("History")
         history_action.triggered.connect(self.show_history_on_new_tab)
 
-        # Cookies
-        example_action = menu.addAction("Cookies")
-        example_action.triggered.connect(lambda: print("Cookies"))
+        # Opcja 3: Cookies
+        cookies_action = menu.addAction("Cookies")
+        cookies_action.triggered.connect(self.show_cookies)
 
         # Dodanie menu do przycisku
         self.menu_button.setMenu(menu)
@@ -201,8 +203,31 @@ class Browser(QMainWindow):
         self.progress_bar.setRange(0, 100)
         self.layout.addWidget(self.progress_bar)
 
+        # Lista na ciasteczka
+        self.cookies = []
+
+        container = self.tab_widget.currentWidget()
+        browser = container.findChild(QWebEngineView)
+
+        if browser:
+            cookie_store = browser.page().profile().cookieStore()
+            cookie_store.cookieAdded.connect(self.on_cookie_added)
+
+        self.load_cookies()
+
+
+
+    """
+    ****************************************************************
+    PASEK NARZĘDZI
+    ****************************************************************
+    """
 
     def navigate_to_url(self):
+        """
+        Metoda, która przechodzi na adres URL wpisany w pasek adresu. Jeśli adres nie zaczyna się od 'http://' lub 'https://',
+        automatycznie dodaje 'https://'. Używa QWebEngineView, aby ustawić URL w bieżącej karcie przeglądarki.
+        """
         url = self.address_bar.text()
         if not url.startswith('http://') and not url.startswith('https://'):
             url = 'https://' + url
@@ -212,45 +237,67 @@ class Browser(QMainWindow):
             browser.setUrl(QUrl(url))
 
     def navigate_home(self):
+        """
+        Metoda, która ustawia adres URL na stronę główną (Google) w aktywnej karcie. Używa QWebEngineView do ustawienia URL.
+        """
         container = self.tab_widget.currentWidget()
         browser = container.findChild(QWebEngineView)
         if browser:
             browser.setUrl(QUrl("https://www.google.com"))
 
     def reload_page(self):
+        """
+        Metoda, która odświeża aktualną stronę w przeglądarce. Ponownie ładuje stronę w QWebEngineView w bieżącej karcie.
+        """
         container = self.tab_widget.currentWidget()
         browser = container.findChild(QWebEngineView)
         if browser:
             browser.reload()
 
     def on_load_started(self):
+        """
+        Metoda wywoływana na początku ładowania strony, ustawia pasek postępu na 0 i sprawia, że pasek postępu jest widoczny.
+        """
         self.progress_bar.setValue(0)
         self.progress_bar.setVisible(True)
 
-    def on_load_finished(self, ok):
-        self.progress_bar.setValue(100)
-        self.progress_bar.setVisible(False)
 
     def update_address_bar(self, url):
+        """
+        Metoda, która aktualizuje tekst w pasku adresu, ustawiając URL bieżącej strony. Używa obiektu QUrl do uzyskania tekstu URL.
+        """
         self.address_bar.setText(url.toString())
 
     def go_back(self):
+        """
+        Metoda, która umożliwia przejście do poprzedniej strony w historii. Sprawdza, czy historia przeglądarki może cofnąć się.
+        """
         container = self.tab_widget.currentWidget()
         browser = container.findChild(QWebEngineView)
         if browser and browser.history().canGoBack():
             browser.back()
 
     def go_forward(self):
+        """
+        Metoda, która umożliwia przejście do następnej strony w historii. Sprawdza, czy historia przeglądarki może przejść do przodu.
+        """
         container = self.tab_widget.currentWidget()
         browser = container.findChild(QWebEngineView)
         if browser and browser.history().canGoForward():
             browser.forward()
 
     def on_url_changed(self, url):
+        """
+        Metoda, która zapisuje historię przeglądania do pliku JSON. Pobiera historię z QWebEngineView i zapisuje URL oraz znacznik czasu.
+        """
         self.save_history()
         self.address_bar.setText(url.toString())
 
     def update_tab_info(self, browser):
+        """
+        Metoda, która aktualizuje tytuł karty, skracając go, jeśli jest zbyt długi.
+        Używa metody `setTabText` na odpowiedniej karcie, aby wyświetlić skrócony tytuł.
+        """
         title = browser.page().title()
         max_title_length = 15
         final_title = title
@@ -265,6 +312,10 @@ class Browser(QMainWindow):
             self.tab_widget.setTabText(index, final_title)
 
     def add_new_tab(self, url="https://www.google.com"):
+        """
+        Metoda, która dodaje nową kartę do przeglądarki. Inicjuje instancję QWebEngineView z domyślnym URL-em, ustawia
+        połączenia do zmiany URL-a i załadowania strony oraz zarządza ciasteczkami.
+        """
         if isinstance(url, str):
             browser = QWebEngineView()
             browser.setUrl(QUrl(url))
@@ -272,6 +323,9 @@ class Browser(QMainWindow):
             browser.urlChanged.connect(self.on_url_changed)
 
             browser.loadFinished.connect(lambda ok, browser=browser: self.update_tab_info(browser))
+
+            cookie_store = browser.page().profile().cookieStore()
+            cookie_store.cookieAdded.connect(self.on_cookie_added)
 
             container = QWidget(self)
             layout = QVBoxLayout(container)
@@ -282,16 +336,33 @@ class Browser(QMainWindow):
             self.tab_widget.setCurrentIndex(index)
 
     def close_tab(self, index):
+        """
+        Metoda, która zamyka kartę na podstawie jej indeksu, pod warunkiem, że nie jest to jedyna karta.
+        """
         if self.tab_widget.count() > 1:
             self.tab_widget.removeTab(index)
 
     def switch_tab(self, index):
+        """
+        Metoda, która przełącza na kartę o podanym indeksie i aktualizuje pasek adresu, aby odzwierciedlał URL bieżącej strony.
+        """
         container = self.tab_widget.widget(index)
         browser = container.findChild(QWebEngineView)
         if browser:
             self.update_address_bar(browser.url())
 
+    """
+    ****************************************************************
+    HISTORIA
+    ****************************************************************
+    """
+
+
     def show_history_on_new_tab(self):
+        """
+        Metoda, która otwiera historię przeglądania na nowej karcie. Pokazuje tabelę z URL-ami i znacznikami czasowymi
+        oraz umożliwia otwieranie wybranych stron z historii.
+        """
         history_widget = QWidget(self)
         history_layout = QVBoxLayout(history_widget)
 
@@ -375,11 +446,17 @@ class Browser(QMainWindow):
         table_widget.itemClicked.connect(self.open_url_from_table)
 
     def open_url_from_table(self, item):
+        """
+        Metoda, która otwiera stronę w nowej karcie, bazując na wybranym URL-u z tabeli historii.
+        """
         url = item.data(Qt.ItemDataRole.UserRole)
         if url:
             self.add_new_tab(url)
 
     def save_history(self):
+        """
+        Metoda, która zapisuje historię przeglądania do pliku JSON. Zapisuje URL i znacznik czasu każdej odwiedzonej strony.
+        """
         container = self.tab_widget.currentWidget()
         browser = container.findChild(QWebEngineView)
 
@@ -407,8 +484,106 @@ class Browser(QMainWindow):
                 json.dump({"history": history_list}, file, indent=4)
 
     def open_url_from_history(self, url):
+        """
+        Metoda, która ustawia URL strony w bieżącej karcie na podstawie URL-a z historii.
+        """
         container = self.tab_widget.currentWidget()
         browser = container.findChild(QWebEngineView)
 
         if browser:
             browser.setUrl(QUrl(url))
+
+    """
+    ****************************************************************
+    PLIKI COOKIES
+    ****************************************************************
+    """
+
+
+    def save_cookies(self):
+        """
+        Metoda, która zapisuje ciasteczka przeglądarki do pliku JSON. Tworzy folder 'data', jeśli nie istnieje.
+        """
+        if not os.path.exists('data'):
+            os.makedirs('data')
+
+        with open('data/cookies.json', 'w') as file:
+            json.dump(self.cookies, file, indent=4)
+
+        print("Ciasteczka zostały zapisane.")
+
+    def load_cookies(self):
+        """
+        Metoda, która wczytuje ciasteczka z pliku JSON, jeśli plik istnieje i zawiera dane. W przypadku błędów
+        wyświetla komunikat i ustawia listę ciasteczek na pustą.
+        """
+        try:
+            if not os.path.exists('data/cookies.json') or os.path.getsize('data/cookies.json') == 0:
+                print("Plik cookies.json nie istnieje lub jest pusty.")
+                self.cookies = []
+                return
+
+            with open('data/cookies.json', 'r') as file:
+                self.cookies = json.load(file)
+
+            print(f"Załadowano {len(self.cookies)} ciasteczek.")
+        except (FileNotFoundError, json.JSONDecodeError) as e:
+            print(f"Nie udało się wczytać ciasteczek: {e}")
+            self.cookies = []
+
+    def closeEvent(self, event):
+        """
+        Metoda, która zapisuje ciasteczka przy zamknięciu aplikacji.
+        """
+        self.save_cookies()
+        super().closeEvent(event)
+
+    def show_cookies(self):
+        """
+        Metoda, która wyświetla zapisane ciasteczka w tabeli na nowej karcie. Tabela zawiera kolumny z nazwą, wartością, domeną,
+        ścieżką, informacjami o bezpieczeństwie i HTTPOnly ciasteczek.
+        """
+        container = QWidget(self)
+        layout = QVBoxLayout(container)
+
+        table = QTableWidget(self)
+        table.setColumnCount(6)
+        table.setHorizontalHeaderLabels(["Name", "Value", "Domain", "Path", "Secure", "HTTP Only"])
+        table.horizontalHeader().setStretchLastSection(True)
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+
+        if not self.cookies:
+            layout.addWidget(QLabel("Brak zapisanych cookies."))
+        else:
+            table.setRowCount(len(self.cookies))
+
+            for row, cookie in enumerate(self.cookies):
+                table.setItem(row, 0, QTableWidgetItem(cookie["name"]))
+                table.setItem(row, 1, QTableWidgetItem(cookie["value"]))
+                table.setItem(row, 2, QTableWidgetItem(cookie["domain"]))
+                table.setItem(row, 3, QTableWidgetItem(cookie["path"]))
+                table.setItem(row, 4, QTableWidgetItem(str(cookie["secure"])))
+                table.setItem(row, 5, QTableWidgetItem(str(cookie["httpOnly"])))
+
+            layout.addWidget(table)
+
+        index = self.tab_widget.addTab(container, "Cookies")
+        self.tab_widget.setCurrentIndex(index)
+
+    def on_cookie_added(self, cookie):
+        """
+        Metoda, która jest wywoływana po dodaniu ciasteczka, zbiera dane ciasteczka i dodaje je do listy przechowywanych ciasteczek.
+        """
+        try:
+            self.cookies.append({
+                "name": cookie.name().data().decode('utf-8', errors='ignore'),
+                "value": cookie.value().data().decode('utf-8', errors='ignore'),
+                "domain": cookie.domain(),
+                "path": cookie.path(),
+                "secure": cookie.isSecure(),
+                "httpOnly": cookie.isHttpOnly(),
+                "expiration": cookie.expirationDate().toString(Qt.DateFormat.ISODate)
+            })
+        except Exception as e:
+            print(f"Błąd podczas dodawania ciasteczka: {e}")
+
