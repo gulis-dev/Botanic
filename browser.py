@@ -1,4 +1,5 @@
-from PyQt6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QLineEdit, QProgressBar, QHBoxLayout, QToolButton
+from PyQt6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QLineEdit, QProgressBar, QHBoxLayout, \
+    QToolButton, QTabWidget
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtCore import QUrl, Qt
 from PyQt6.QtGui import QIcon
@@ -22,7 +23,7 @@ class Browser(QMainWindow):
         self.layout.setContentsMargins(0, 0, 0, 0)
         self.layout.setSpacing(0)
 
-        # Pasek narzędzi i pasek adresu
+        # Pasek narzędzi i pasek adresu (nad kartami)
         self.address_layout = QHBoxLayout()
         self.layout.addLayout(self.address_layout)
 
@@ -33,7 +34,6 @@ class Browser(QMainWindow):
         # Styl przycisków
         button_style = """
             QToolButton {
-                 /* Pomarańczowy kolor */
                 color: white;
                 border-radius: 17px;
                 padding: 8px;
@@ -44,7 +44,7 @@ class Browser(QMainWindow):
                 background-color: #524025;
             }
             QToolButton:pressed {
-                background-color: #8c5400;  /* Ciemniejszy pomarańczowy */
+                background-color: #8c5400; 
             }
         """
 
@@ -87,8 +87,48 @@ class Browser(QMainWindow):
                 padding-left: 30px
             }
         """)
-        self.address_bar.returnPressed.connect(self.navigate_to_url)
+
         self.address_layout.addWidget(self.address_bar)
+
+        # Widget z kartami
+        self.tab_widget = QTabWidget(self)
+        self.tab_widget.setTabsClosable(True)
+        self.tab_widget.tabCloseRequested.connect(self.close_tab)
+        self.tab_widget.currentChanged.connect(self.switch_tab)
+
+        tab_style = """
+            QTabWidget::pane {
+                border: none;
+            }
+            QTabBar::tab {
+                background-color: #404040;
+                padding: 5px 15px;
+                margin-right: 5px;
+                border-radius: 10px;
+            }
+            QTabBar::tab:selected {
+                background-color: #696969;
+                border-color: #a1a1a1;
+                font-weight: bold;
+            }
+            QTabBar::tab:hover {
+                background-color: #525252;
+            }
+        """
+        self.tab_widget.setStyleSheet(tab_style)
+
+        # Dodanie widgetu kart poniżej paska narzędzi
+        self.layout.addWidget(self.tab_widget)
+
+        # Dodanie przycisku do dodawania nowych kart
+        self.new_tab_button = QToolButton(self)
+        self.new_tab_button.setIcon(QIcon("assets/icons/new_tab_icon.svg"))
+        self.new_tab_button.setStyleSheet(button_style)
+        self.new_tab_button.clicked.connect(lambda: self.add_new_tab("https://www.google.com"))
+        self.toolbar_layout.addWidget(self.new_tab_button)
+
+        # Dodanie pierwszej karty
+        self.add_new_tab()
 
         # Pasek postępu
         self.progress_bar = QProgressBar(self)
@@ -96,27 +136,26 @@ class Browser(QMainWindow):
         self.progress_bar.setRange(0, 100)
         self.layout.addWidget(self.progress_bar)
 
-        # Przeglądarka
-        self.browser = QWebEngineView(self)
-        self.browser.loadStarted.connect(self.on_load_started)
-        self.browser.loadFinished.connect(self.on_load_finished)
-        self.browser.urlChanged.connect(self.update_address_bar)
-        self.layout.addWidget(self.browser)
-
-        # Domyślna strona
-        self.browser.setUrl(QUrl("https://www.google.com"))
-
     def navigate_to_url(self):
         url = self.address_bar.text()
         if not url.startswith('http://') and not url.startswith('https://'):
             url = 'https://' + url
-        self.browser.setUrl(QUrl(url))
+
+        browser = self.tab_widget.currentWidget()
+        if browser:
+            browser.setUrl(QUrl(url))
 
     def navigate_home(self):
-        self.browser.setUrl(QUrl("https://www.google.com"))
+        container = self.tab_widget.currentWidget()
+        browser = container.findChild(QWebEngineView)
+        if browser:
+            browser.setUrl(QUrl("https://www.google.com"))
 
     def reload_page(self):
-        self.browser.reload()
+        container = self.tab_widget.currentWidget()
+        browser = container.findChild(QWebEngineView)
+        if browser:
+            browser.reload()
 
     def on_load_started(self):
         self.progress_bar.setValue(0)
@@ -130,9 +169,58 @@ class Browser(QMainWindow):
         self.address_bar.setText(url.toString())
 
     def go_back(self):
-        if self.browser.history().canGoBack():
-            self.browser.back()
+        container = self.tab_widget.currentWidget()
+        browser = container.findChild(QWebEngineView)
+        if browser and browser.history().canGoBack():
+            browser.back()
 
     def go_forward(self):
-        if self.browser.history().canGoForward():
-            self.browser.forward()
+        container = self.tab_widget.currentWidget()
+        browser = container.findChild(QWebEngineView)
+        if browser and browser.history().canGoForward():
+            browser.forward()
+
+    def on_url_changed(self, url):
+        self.address_bar.setText(url.toString())
+
+    def update_tab_info(self, browser):
+        title = browser.page().title()
+        max_title_length = 15
+        final_title = title
+        if len(title) >= max_title_length:
+            final_title = ""
+            for i in range(0, max_title_length):
+                final_title += title[i]
+            final_title += "..."
+        index = self.tab_widget.indexOf(browser.parent())
+
+        if index != -1:
+            self.tab_widget.setTabText(index, final_title)
+
+    def add_new_tab(self, url="https://www.google.com"):
+        if isinstance(url, str):
+            browser = QWebEngineView()
+            browser.setUrl(QUrl(url))
+
+            browser.urlChanged.connect(self.on_url_changed)
+
+            browser.loadFinished.connect(lambda ok, browser=browser: self.update_tab_info(browser))
+
+            container = QWidget(self)
+            layout = QVBoxLayout(container)
+            layout.setContentsMargins(0, 10, 0, 0)
+            layout.addWidget(browser)
+
+            index = self.tab_widget.addTab(container, "New card")
+            self.tab_widget.setCurrentIndex(index)
+
+    def close_tab(self, index):
+        if self.tab_widget.count() > 1:
+            self.tab_widget.removeTab(index)
+
+    def switch_tab(self, index):
+        container = self.tab_widget.widget(index)
+        browser = container.findChild(QWebEngineView)
+        if browser:
+            self.update_address_bar(browser.url())
+
