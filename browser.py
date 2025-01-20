@@ -1,24 +1,57 @@
 import json
 from datetime import datetime
+from time import sleep
 
 from PyQt6.QtWidgets import QMainWindow, QVBoxLayout, QWidget, QLineEdit, QProgressBar, QHBoxLayout, \
     QToolButton, QTabWidget, QMenu, QLabel, QTableWidgetItem, QScrollArea, QTableWidget, \
-    QHeaderView
+    QHeaderView, QTextEdit, QPushButton, QMessageBox, QPlainTextEdit
 from PyQt6.QtWebEngineWidgets import QWebEngineView
-from PyQt6.QtCore import QUrl, Qt
+from PyQt6.QtCore import QUrl, Qt, QTimer
 from PyQt6.QtGui import QIcon
 
 import os
+
+import time
+
+
+from bot_manager import BotManager
+from script_processor import ScriptProcessor
+
+
 os.environ["QT_QPA_PLATFORM_PLUGIN_PATH"] = "/opt/homebrew/Cellar/qt/6.7.3/share/qt/plugins/platforms"
 
 
-class Browser(QMainWindow):
+class Browser(QMainWindow, QWebEngineView):
     def __init__(self):
         super().__init__()
+        self.script_processor = ScriptProcessor(self.add_new_tab, self.navigate_to_custom_url)
+
+
+        self.script_data = {}
+        self.current_line = 0
+
+        self.scripts = []
+        self.scripts_file = "data/scripts.json"  # Plik, w którym będziemy przechowywać skrypty
+
+        # Tworzymy folder 'data' i plik 'scripts.json' jeśli nie istnieją
+        if not os.path.exists("data"):
+            os.makedirs("data")
+        if not os.path.isfile(self.scripts_file):
+            with open(self.scripts_file, 'w') as file:
+                json.dump([], file)  # Inicjalizacja pustą listą
+
 
         # Ustawienia okna głównego
-        self.setWindowTitle("Botanic Web Browser")
+        self.setWindowTitle("Botanic Web Browser (Beta 1.0)")
         self.setGeometry(100, 100, 1200, 800)
+
+
+        # Podpięcie metod
+        self.bot_manager = BotManager(self)
+
+        # Ustawienie ikony aplikacji
+        icon_path = "assets/icons/botanic_logo.ico"
+        self.setWindowIcon(QIcon(icon_path))
 
         # Centralny widget
         self.central_widget = QWidget(self)
@@ -53,6 +86,7 @@ class Browser(QMainWindow):
                 background-color: #8c5400; 
             }
         """
+
 
         # Przycisk Wstecz
         self.back_button = QToolButton(self)
@@ -95,49 +129,86 @@ class Browser(QMainWindow):
         """)
         self.address_layout.addWidget(self.address_bar)
 
+
+        menu_button_styles = """
+                    QToolButton {
+                        color: white;
+                        border-radius: 17px;
+                        padding: 8px;
+                        border: none;
+                        margin: 5px;
+                    }
+                    QToolButton::menu-indicator { 
+                        image: none;  /* Usuwa wskaźnik strzałki */
+                        width: 0px;   /* Ustawia szerokość wskaźnika na 0 */
+                    }
+                    QToolButton:hover {
+                        background-color: #524025;
+                    }
+                    QToolButton:pressed {
+                        background-color: #8c5400; 
+                    }
+                """
+
+        menu_styles = """
+                    QMenu {
+                        background-color: #2c2c2c;
+                        border: 1px solid #444;
+                        padding: 5px;
+                        border-radius: 5px;
+                    }
+                    QMenu::item {
+                        color: white;
+                        padding: 7px 35px;  /* Odstępy wewnętrzne */
+                        border-radius: 5px;
+                    }
+                    QMenu::item:selected {
+                        background-color: #524025;  /* Kolor podświetlenia */
+                    }
+                """
+
+        # Przycisk Menu Botanic
+        self.botanic_menu_button = QToolButton(self)
+        self.botanic_menu_button.setIcon(QIcon("assets/icons/botanic_logo.png"))
+        self.botanic_menu_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.botanic_menu_button.setArrowType(Qt.ArrowType.NoArrow)
+        self.botanic_menu_button.setStyleSheet(menu_button_styles)
+
+        # Menu Rozwijane Botanic
+        botanic_menu = QMenu(self)
+        botanic_menu.setStyleSheet(menu_styles)
+
+        # Opcja 1: Nowa karta
+        history_action = botanic_menu.addAction("Create a new script")
+        history_action.triggered.connect(self.create_script_tab)
+
+        # Opcja 2: Historia
+        history_action = botanic_menu.addAction("Script List")
+        history_action.triggered.connect(self.show_scripts_tab)
+
+        # Opcja 3: Cookies
+        cookies_action = botanic_menu.addAction("Documentation")
+        cookies_action.triggered.connect(self.show_cookies)
+
+        # Dodanie menu botanic do przycisku
+        self.botanic_menu_button.setMenu(botanic_menu)
+
+        self.address_layout.addWidget(self.botanic_menu_button)
+
+
+
+
         # Przycisk Menu
         self.menu_button = QToolButton(self)
         self.menu_button.setIcon(QIcon("assets/icons/menu_icon.svg"))
         self.menu_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.menu_button.setArrowType(Qt.ArrowType.NoArrow)
-        self.menu_button.setStyleSheet("""
-            QToolButton {
-                color: white;
-                border-radius: 17px;
-                padding: 8px;
-                border: none;
-                margin: 5px;
-            }
-            QToolButton::menu-indicator { 
-                image: none;  /* Usuwa wskaźnik strzałki */
-                width: 0px;   /* Ustawia szerokość wskaźnika na 0 */
-            }
-            QToolButton:hover {
-                background-color: #524025;
-            }
-            QToolButton:pressed {
-                background-color: #8c5400; 
-            }
-        """)
+        self.menu_button.setStyleSheet(menu_button_styles)
+
 
         # Menu Rozwijane
         menu = QMenu(self)
-        menu.setStyleSheet("""
-            QMenu {
-                background-color: #2c2c2c;
-                border: 1px solid #444;
-                padding: 5px;
-                border-radius: 5px;
-            }
-            QMenu::item {
-                color: white;
-                padding: 7px 35px;  /* Odstępy wewnętrzne */
-                border-radius: 5px;
-            }
-            QMenu::item:selected {
-                background-color: #524025;  /* Kolor podświetlenia */
-            }
-        """)
+        menu.setStyleSheet(menu_styles)
 
 
         # Opcja 1: Nowa karta
@@ -232,7 +303,20 @@ class Browser(QMainWindow):
         if not url.startswith('http://') and not url.startswith('https://'):
             url = 'https://' + url
 
-        browser = self.tab_widget.currentWidget()
+        container = self.tab_widget.currentWidget()
+        browser = container.findChild(QWebEngineView)
+        if browser:
+            browser.setUrl(QUrl(url))
+    def navigate_to_custom_url(self, url):
+        """
+        Metoda, która przechodzi na adres URL z parametru. Jeśli adres nie zaczyna się od 'http://' lub 'https://',
+        automatycznie dodaje 'https://'. Używa QWebEngineView, aby ustawić URL w bieżącej karcie przeglądarki.
+        """
+        if not url.startswith('http://') and not url.startswith('https://'):
+            url = 'https://' + url
+
+        container = self.tab_widget.currentWidget()
+        browser = container.findChild(QWebEngineView)
         if browser:
             browser.setUrl(QUrl(url))
 
@@ -587,3 +671,277 @@ class Browser(QMainWindow):
         except Exception as e:
             print(f"Błąd podczas dodawania ciasteczka: {e}")
 
+    """
+    ****************************************************************
+    SKRYPTY
+    ****************************************************************
+    """
+
+    def create_script_tab(self):
+        """
+        Tworzy kartę do pisania i zapisywania skryptów z polem na nazwę, kod i przyciskiem "Save".
+        """
+        # Tworzymy nową kartę do tworzenia skryptu
+        create_script_widget = QWidget()
+        create_script_layout = QVBoxLayout(create_script_widget)
+
+        # Pole na nazwę skryptu
+        name_label = QLabel("Script Name:")
+        name_input = QLineEdit()
+
+        # Duże pole do pisania skryptu
+        script_label = QLabel("Script Code:")
+        script_input = QTextEdit()
+        script_input.setPlaceholderText("Write your script here...")
+
+        # Przycisk do zapisania skryptu
+        save_button = QPushButton("Save Script")
+        save_button.clicked.connect(lambda: self.save_script(name_input.text(), script_input.toPlainText()))
+
+        # Dodajemy elementy do layoutu
+        create_script_layout.addWidget(name_label)
+        create_script_layout.addWidget(name_input)
+        create_script_layout.addWidget(script_label)
+        create_script_layout.addWidget(script_input)
+        create_script_layout.addWidget(save_button)
+
+        # Dodajemy nową kartę do widżetu zakładek
+        self.tab_widget.addTab(create_script_widget, "Create Script")
+        self.tab_widget.setCurrentIndex(self.tab_widget.count() - 1)
+
+    def save_script(self, name, script):
+        """
+        Zapisuje nowy skrypt do pliku, sprawdzając, czy nazwa już istnieje. Dodaje do tabeli i aktualizuje listę.
+        """
+        # Sprawdzamy, czy skrypt o tej samej nazwie już istnieje
+        with open(self.scripts_file, 'r') as file:
+            scripts = json.load(file)
+
+        if any(existing_script["name"] == name for existing_script in scripts):
+            self.show_message("Error", f"A script with the name '{name}' already exists!")
+            return
+
+        # Zapisujemy skrypt do pliku
+        script_data = {
+            "name": name,
+            "script": script,
+            "created": time.strftime("%Y-%m-%d %H:%M:%S")
+        }
+
+        # Dodajemy nowy skrypt do listy
+        scripts.append(script_data)
+
+        # Zapisujemy zaktualizowaną listę skryptów do pliku
+        with open(self.scripts_file, 'w') as file:
+            json.dump(scripts, file, indent=4)
+
+        # Zaktualizowanie self.scripts
+        self.scripts = scripts
+
+        # Dodanie skryptu do tabeli
+        self.add_script_table_row(name, script_data["created"])
+
+        print(f"Script '{name}' saved successfully!")
+        self.show_message("Success", f"Script {name} added")
+
+    def show_scripts_tab(self):
+        """
+        Tworzy kartę z tabelą skryptów, umożliwiając ich przeglądanie, dodawanie i zarządzanie.
+        """
+        # Tworzymy nową kartę
+        scripts_widget = QWidget()
+        scripts_layout = QVBoxLayout(scripts_widget)
+
+        # Tworzymy tabelę skryptów
+        self.scripts_table = QTableWidget(scripts_widget)
+        self.scripts_table.setColumnCount(3)
+        self.scripts_table.setHorizontalHeaderLabels(["Name", "Created", "Actions"])
+
+        # Dodajemy tabelę do layoutu
+        scripts_layout.addWidget(self.scripts_table)
+
+        # Tworzymy przyciski dla akcji
+        add_script_button = QPushButton("Add New Script")
+        add_script_button.clicked.connect(self.create_script_tab)
+
+        # Dodajemy przycisk do layoutu
+        scripts_layout.addWidget(add_script_button)
+
+        # Wczytujemy skrypty z pliku
+        self.load_scripts()
+
+        # Dostosowanie wysokości wierszy automatycznie
+        self.scripts_table.resizeRowsToContents()
+
+        # Dodajemy nową kartę do widżetu zakładek
+        self.tab_widget.addTab(scripts_widget, "Scripts")
+        self.tab_widget.setCurrentIndex(self.tab_widget.count() - 1)
+
+    def load_scripts(self):
+        """
+        Ładuje skrypty z pliku JSON, a jeśli plik nie istnieje, tworzy pusty. Aktualizuje tabelę.
+        """
+        # Wczytujemy skrypty z pliku
+        if not os.path.exists(self.scripts_file):
+            # Tworzymy pusty plik, jeśli go nie ma
+            with open(self.scripts_file, 'w') as file:
+                json.dump([], file, indent=4)
+
+        with open(self.scripts_file, 'r') as file:
+            scripts = json.load(file)
+
+        # Aktualizujemy self.scripts
+        self.scripts = scripts
+
+        # Dodajemy skrypty do tabeli
+        for script in scripts:
+            self.add_script_table_row(script["name"], script["created"])
+
+    def add_script_table_row(self, name, created):
+        """
+        Dodaje nowy wiersz do tabeli skryptów z nazwą, datą i przyciskami akcji.
+        """
+        # Dodawanie skryptu do tabeli
+        row_position = self.scripts_table.rowCount()
+        self.scripts_table.insertRow(row_position)
+
+        self.scripts_table.setItem(row_position, 0, QTableWidgetItem(name))
+        self.scripts_table.setItem(row_position, 1, QTableWidgetItem(created))
+
+        actions_widget = QWidget()
+        actions_layout = QVBoxLayout(actions_widget)
+
+        # Tworzymy przyciski
+        edit_button = QPushButton("Edit")
+        edit_button.clicked.connect(lambda: self.edit_script(name))
+
+        delete_button = QPushButton("Delete")
+        delete_button.clicked.connect(lambda: self.delete_script(name))
+
+        run_button = QPushButton("Run")
+        run_button.clicked.connect(lambda: self.run_script(name))
+
+        actions_layout.addWidget(edit_button)
+        actions_layout.addWidget(delete_button)
+        actions_layout.addWidget(run_button)
+
+        self.scripts_table.setCellWidget(row_position, 2, actions_widget)
+
+        # Dostosowanie wysokości wiersza po dodaniu zawartości
+        self.scripts_table.resizeRowsToContents()
+
+    def edit_script(self, name):
+        """
+        Otwiera kartę edycji skryptu z możliwością modyfikacji kodu i zapisania zmian.
+        """
+        # Wyszukaj skrypt o danej nazwie, jeśli istnieje
+        script_data = next(
+            (script for script in self.scripts if script["name"].strip().lower() == name.strip().lower()), None)
+
+        if not script_data:
+            self.show_message("Error", f"Script with name '{name}' not found.")
+            return
+
+        # Tworzymy okno do edytowania skryptu
+        edit_widget = QWidget()
+        edit_layout = QVBoxLayout(edit_widget)
+
+        # Duże pole do pisania skryptu
+        script_label = QLabel("Script Code:")
+
+        # Using QPlainTextEdit to handle plain text
+        script_input = QPlainTextEdit(script_data["script"])
+        script_input.setPlaceholderText("Edit your script here...")
+
+        # Przycisk do zapisania zmian
+        save_button = QPushButton("Save Changes")
+        save_button.clicked.connect(
+            lambda: self.save_edited_script(script_input.toPlainText(), name))
+
+        # Dodajemy elementy do layoutu
+        edit_layout.addWidget(script_label)
+        edit_layout.addWidget(script_input)
+        edit_layout.addWidget(save_button)
+
+        # Dodajemy okno edytora do nowej zakładki
+        self.tab_widget.addTab(edit_widget, "Edit Script")
+        self.tab_widget.setCurrentIndex(self.tab_widget.count() - 1)
+
+    def save_edited_script(self, new_script, old_name):
+        """
+        Aktualizuje kod istniejącego skryptu w pliku i tabeli.
+        """
+        # Zaktualizuj skrypt w pliku i tabeli
+        for script in self.scripts:
+            if script["name"] == old_name:
+                script["script"] = new_script
+                break
+
+        # Zapisz zaktualizowaną listę skryptów do pliku
+        with open(self.scripts_file, 'w') as file:
+            json.dump(self.scripts, file, indent=4)
+
+        # Zaktualizuj tabelę
+        self.update_script_in_table(old_name, script["created"])
+
+        self.show_message("Success", f"Script '{old_name}' updated.")
+        print(f"Script '{old_name}' updated.")
+
+    def update_script_in_table(self, new_name, created):
+        """
+        Aktualizuje nazwę i datę skryptu w tabeli.
+        """
+        for row in range(self.scripts_table.rowCount()):
+            if self.scripts_table.item(row, 0).text() == new_name:
+                self.scripts_table.setItem(row, 0, QTableWidgetItem(new_name))
+                self.scripts_table.setItem(row, 1, QTableWidgetItem(created))
+                break
+
+    def delete_script(self, name):
+        """
+        Usuwa skrypt z listy, pliku i tabeli.
+        """
+        # Usuwamy skrypt z listy
+        self.scripts = [script for script in self.scripts if script["name"] != name]
+
+        # Zaktualizuj plik
+        with open(self.scripts_file, 'w') as file:
+            json.dump(self.scripts, file, indent=4)
+
+        # Usuwamy skrypt z tabeli
+        for row in range(self.scripts_table.rowCount()):
+            if self.scripts_table.item(row, 0).text() == name:
+                self.scripts_table.removeRow(row)
+                break
+
+        self.show_message("Success", f"Script '{name}' deleted.")
+        print(f"Script '{name}' deleted.")
+
+    def run_script(self, name):
+        """
+        Uruchamia skrypt o podanej nazwie.
+        """
+        print(f"Running script {name}")
+        script_data = next(script for script in self.scripts if script["name"] == name)
+        self.execute_script(script_data["script"])
+
+    def execute_script(self, script):
+        """
+        Przetwarza i wykonuje komendy skryptu linia po linii.
+        """
+        script_data = {"script": script}
+        self.script_processor.set_script_data(script_data)
+        self.script_processor.process_next_command()
+
+    """
+    ****************************************************************
+    INNE
+    ****************************************************************
+    """
+
+    def show_message(self, title, message):
+        """
+        Wyświetla komunikat w oknie dialogowym.
+        """
+        msg_box = QMessageBox()
+        msg_box.critical(self, title, message)
