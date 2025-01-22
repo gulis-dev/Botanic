@@ -14,7 +14,6 @@ import os
 import time
 
 
-from bot_manager import BotManager
 from script_processor import ScriptProcessor
 
 
@@ -45,9 +44,6 @@ class Browser(QMainWindow, QWebEngineView):
         self.setWindowTitle("Botanic Web Browser (Beta 1.0)")
         self.setGeometry(100, 100, 1200, 800)
 
-
-        # Podpięcie metod
-        self.bot_manager = BotManager(self)
 
         # Ustawienie ikony aplikacji
         icon_path = "assets/icons/botanic_logo.ico"

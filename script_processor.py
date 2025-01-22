@@ -4,8 +4,8 @@ class ScriptProcessor:
     def __init__(self, add_new_tab, navigate_to_custom_url):
         """
         Klasa do przetwarzania skryptów.
-        :param add_new_tab: Funkcja do otwierania nowej karty.
-        :param navigate_to_custom_url: Funkcja do nawigacji na konkretny URL.
+        add_new_tab: Funkcja do otwierania nowej karty.
+        navigate_to_custom_url: Funkcja do nawigacji na konkretny URL.
         """
         self.script_data = None
         self.current_line = 0
@@ -63,22 +63,15 @@ class ScriptProcessor:
         self.process_next_command()
 
     def extract_argument(self, line):
-        """
-        Wyciągnij argument z linii komendy.
-        """
         start = line.find("(")
         end = line.rfind(")")
         if start != -1 and end != -1:
             return line[start + 1:end].strip().strip('"')
         return None
     def extract_arguments(self, line):
-        """
-        Extracts multiple arguments from a command (e.g., extract ['#field', 'value', '#submit'] from 'fill_form(#field, value, #submit)')
-        """
         start = line.find('(')
         end = line.find(')')
         if start != -1 and end != -1:
-            # Split arguments based on commas, handling the case for strings with quotes
             arguments = line[start + 1:end].split(',')
             return [arg.strip().strip('"').strip("'") for arg in arguments]
         return []
